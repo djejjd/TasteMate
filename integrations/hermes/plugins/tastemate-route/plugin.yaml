@@ -1,0 +1,6 @@
+name: tastemate-route
+version: 0.1.0
+description: "Route explicit @taste recommendation requests to TasteMate MCP via gateway rewrite."
+author: "TasteMate"
+hooks:
+  - pre_gateway_dispatch

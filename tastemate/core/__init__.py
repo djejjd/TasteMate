@@ -1,0 +1,1 @@
+"""TasteMate module namespace."""
