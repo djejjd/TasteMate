@@ -2,157 +2,193 @@
 
 ## 一、当前阶段
 
-当前处于迭代一前的方案论证阶段。
+```text
+迭代一已完成。
+当前进入迭代二需求确认与设计阶段。
+```
 
-目标是确认：
+迭代一已经验证：
 
 ```text
-方向是否合理
-数据流是否清楚
-是否能不改 Hermes 源码接入
-成本是否可控
-第一版要验证什么闭环
+Hermes 能发现 TasteMate MCP。
+显式 @taste 能通过 Hermes 插件触发 TasteMate。
+TasteMate 能完成候选重排。
+用户明确反馈能写入 profile evidence_log。
+```
+
+迭代一的主要限制：
+
+```text
+tastemate-route 插件仍使用 fixed_probe_candidates。
+固定候选只能验证通道，不能验证真实推荐质量。
 ```
 
 ---
 
-## 二、迭代一：显式启用的后置重排闭环
+## 二、迭代二：真实候选排序
 
 ### 目标
 
-实现一个最小可用的 TasteMate MCP server，让 Hermes 在用户显式使用 `@taste` 时，可以调用 TasteMate 对候选结果进行个性化排序。
+把固定候选替换为真实候选，让 Hermes 主动整理 candidates 后调用 TasteMate 排序。
+
+核心流程：
+
+```text
+用户 @taste 提问
+  ↓
+Hermes 基于用户给定候选或已有知识整理真实候选
+  ↓
+Hermes 按 candidates 协议调用 mcp_tastemate_rank_candidates
+  ↓
+TasteMate 对真实候选排序
+  ↓
+Hermes 基于排序结果回复
+```
 
 ### 范围
 
 ```text
-MCP server
-rank_candidates
-record_feedback
-get_profile
-本地 profile store
-基础评分
-基础反馈学习
-Hermes 配置接入
+candidates 协议
+用户给定候选的结构化
+Hermes 基于已有知识生成候选
+真实 candidates 排序
+最小预算约束提示
 ```
 
 ### 不做
 
 ```text
-不改 Hermes 源码
+不默认访问外网做深度调研
+不做 Hermes 工具结果自动抽取
 不做搜索前偏好注入
-不做自动拦截所有搜索结果
-不做 UI
-不做复杂模型训练
+不做 feedback 画像增强
+不做 Obsidian 偏好底座
+不修改 Hermes 源码
+```
+
+### 已完成穿刺结论
+
+```text
+问题 1：用户给候选 -> Hermes 结构化 -> TasteMate 排序，PASS。
+问题 2：不访问外网 -> Hermes 基于已有知识生成候选 -> TasteMate 排序，PASS。
+问题 3：允许一次外网补全 -> 最终 fallback 并排序，部分 PASS；外网步骤耗时 60s，不进入迭代二主路径。
 ```
 
 ### 验收标准
 
 ```text
-Hermes 能发现 TasteMate MCP 工具
-@taste 推荐类问题能触发 rank_candidates
-事实类问题能返回 passthrough
-推荐类候选能输出 query_relevance、preference_fit、final_score
-排序结果能解释为什么更适合我
-用户明确反馈能写入 evidence_log
-后续排序能体现已有反馈
-```
-
-### 主要风险
-
-```text
-Hermes 不一定稳定调用 rank_candidates
-候选结果格式可能不统一
-LLM 评分可能不稳定
-早期偏好数据少，个性化效果有限
-```
-
-### 风险应对
-
-```text
-使用 @taste 明确触发
-工具描述中明确调用时机
-rank_candidates 兼容松散候选结构
-所有评分必须带解释
-偏好更新先写 evidence，避免学歪
+不再用 fixed_probe_candidates 作为主路径。
+Hermes 调用 mcp_tastemate_rank_candidates 时传入真实 candidates。
+candidates 至少包含 id、title、summary、url、metadata。
+用户给定候选和 Hermes 已有知识候选两类输入都能完成排序。
+默认不访问外网、不写文件、不生成长报告。
 ```
 
 ---
 
-## 三、迭代二：搜索前轻量偏好增强
+## 三、迭代三：反馈画像增强
 
 ### 目标
 
-在迭代一闭环成立后，让 TasteMate 能在搜索前给 Hermes 提供轻量偏好上下文，提升候选召回质量。
+把 record_feedback 写入的 evidence_log 更系统地沉淀为稳定画像，让反馈真正影响后续排序。
 
 ### 可能能力
 
 ```text
-pre_llm_call hook 注入偏好摘要
-get_search_hints 工具
-按任务生成轻量偏好关键词
-负向偏好过滤提示
-current_focus 注入
-```
-
-### 设计原则
-
-```text
-偏好只轻度影响搜索，不强行收窄召回。
-搜索前偏好用于提示方向，最终排序仍由 rank_candidates 完成。
-事实类问题不注入偏好。
+profile updater
+stable_preferences 沉淀规则
+negative_preferences 沉淀规则
+多次反馈聚合
+单次反馈权重上限
 ```
 
 ### 验收标准
 
 ```text
-推荐类问题召回候选更贴近个人偏好
-事实类问题不被偏好干扰
-搜索结果仍保持足够多样性
-整体模型调用成本可控
+选择“本地优先”后，后续类似问题本地候选排名上升。
+拒绝“企业 SaaS”后，类似候选排名下降。
+单次反馈不会过度污染长期画像。
 ```
 
 ---
 
-## 四、迭代三：更强的 Hermes 外置编排
+## 四、迭代四：Obsidian 偏好底座
 
 ### 目标
 
-如果仅靠 MCP 工具描述无法稳定触发 TasteMate，则考虑用 Hermes plugin/hook 增强编排，但仍尽量不改 Hermes 源码。
+把 Obsidian 作为长期偏好和个人知识材料来源，同时保留 profile.json 作为机器可读画像索引。
+
+### 定位
+
+```text
+Obsidian：人类可读、可编辑、可审计的偏好知识库。
+profile.json：机器可读、排序稳定使用的画像索引。
+```
 
 ### 可能能力
 
 ```text
-transform_tool_result 标记搜索结果
-post_tool_call 记录候选来源
-pre_llm_call 注入本轮 TasteMate 状态
-自动判断是否应调用 rank_candidates
+配置 Obsidian vault 路径
+定义 TasteMate 专用目录
+从 Markdown 笔记抽取 preference evidence
+同步到 profile.json
+让 get_profile 能解释偏好来源
 ```
+
+---
+
+## 五、迭代五：自动候选抽取
+
+### 目标
+
+验证并实现 observed_tool_candidates，从 Hermes 搜索或工具结果中自动抽取候选。
 
 ### 触发条件
 
-只有当迭代一出现明显问题时才进入：
+```text
+迭代二真实候选排序稳定后再进入。
+```
+
+### 关键风险
 
 ```text
-Hermes 经常忘记调用 rank_candidates
-候选结果无法稳定传入 TasteMate
-需要更可靠地控制预算和调用顺序
+Hermes 是否向插件暴露搜索结果或工具 observation。
+工具结果格式是否稳定。
+候选去重、字段补全、置信度判断是否可控。
 ```
 
 ---
 
-## 五、长期方向
+## 六、迭代六：搜索前偏好注入
 
-长期可以考虑：
+### 目标
+
+在搜索前给 Hermes 提供轻量偏好 hints，提高召回质量。
+
+### 边界
 
 ```text
-更稳定的偏好画像管理
-批处理 profile updater
-离线评估推荐质量
-多模型成本路由
-候选特征抽取缓存
-轻量 embedding 检索
-可视化偏好画像
+只提供轻量 hints。
+不强行改写用户问题。
+事实类问题不介入。
+用户未显式 @taste 默认不介入。
 ```
 
-这些不进入迭代一。
+---
 
+## 七、迭代七：gateway send API / 更自然回复通道
+
+### 目标
+
+探索比 pre_gateway_dispatch rewrite 更自然的回复方式。
+
+### 可能能力
+
+```text
+gateway send API
+追加回复
+结构化结果
+多阶段回复
+```
+
+这些能力不阻塞当前 rewrite 主链路。
