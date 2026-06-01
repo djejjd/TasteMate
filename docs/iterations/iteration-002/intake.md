@@ -24,7 +24,6 @@ TasteMate 只负责排序和解释。
 定义真实 candidates 协议。
 支持用户给定候选的结构化排序。
 支持 Hermes 基于已有知识生成候选并排序。
-默认避免外网实时调研造成延迟。
 ```
 
 ## 四、非目标
@@ -35,7 +34,6 @@ TasteMate 只负责排序和解释。
 不做 feedback 画像增强。
 不做 Obsidian 偏好底座。
 不改 Hermes 源码。
-不把外网深度调研纳入迭代二主路径。
 ```
 
 ## 五、约束
@@ -43,14 +41,14 @@ TasteMate 只负责排序和解释。
 ```text
 技术约束：TasteMate 继续作为 MCP server；Hermes 主动调用 mcp_tastemate_rank_candidates。
 范围约束：只替换固定候选主路径，不扩展反馈学习。
-成本约束：默认不访问外网；不写文件；不生成长报告。
+成本约束：候选整理必须服务于排序，不扩展成长报告生成。
 时间约束：先完成设计和开发规格，再进入 Plan。
 ```
 
 ## 六、当前阶段
 
 ```text
-Design
+Plan 准备
 ```
 
 ## 七、需要调研的问题
@@ -59,7 +57,7 @@ Design
 1. candidates 最小字段如何定义。
 2. Hermes 主动整理 candidates 的提示和编排边界如何写入文档。
 3. fixed_probe_candidates 如何保留为测试路径，但不进入迭代二主路径。
-4. 外网补全失败或超时时如何降级。
+4. Hermes 未形成足够 candidates 时如何降级。
 ```
 
 ## 八、输出产物

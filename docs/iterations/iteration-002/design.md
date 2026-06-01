@@ -7,8 +7,6 @@
 TasteMate 只接收真实 candidates 并排序，不负责搜索。
 ```
 
-迭代二主路径默认不访问外网，避免国外站点访问慢、安全策略拦截和长报告生成带来的延迟。
-
 ## 二、背景与问题
 
 迭代一已经打通：
@@ -32,7 +30,7 @@ fixed_probe_candidates
 支持用户给定候选。
 支持 Hermes 基于已有知识生成候选。
 明确 candidates 最小协议。
-默认不访问外网、不写文件、不生成长报告。
+明确 Hermes 候选整理不能替代 TasteMate 排序。
 ```
 
 ## 四、非目标
@@ -67,7 +65,7 @@ Hermes 基于排序结果回复
 ```text
 用户 @taste + 推荐目标
   ↓
-Hermes 不访问外网，基于已有知识列出 3-5 个真实候选
+Hermes 基于已有知识列出 3-5 个真实候选
   ↓
 Hermes 整理 candidates
   ↓
@@ -76,12 +74,6 @@ Hermes 调用 mcp_tastemate_rank_candidates
 TasteMate 返回 ranked_candidates
   ↓
 Hermes 基于排序结果回复
-```
-
-### 非默认路径：轻量外网补全
-
-```text
-后续扩展，不进入迭代二主路径。
 ```
 
 ## 六、模块边界
@@ -119,7 +111,6 @@ profile 更新。
 
 ```text
 搜索候选。
-访问外网。
 判断 Hermes 是否已经充分调研。
 ```
 
@@ -174,6 +165,8 @@ metadata
 url
 source
 ```
+
+`url` 和 `source` 缺失不阻塞迭代二真实候选排序验收。
 
 ### metadata 最小推荐字段
 
@@ -239,6 +232,25 @@ Hermes 说明候选不足。
 Hermes 要求补充候选信息。
 ```
 
+### 候选缺少必填字段
+
+缺少以下任一字段时，候选不满足迭代二最小协议：
+
+```text
+id
+title
+summary
+metadata
+```
+
+降级：
+
+```text
+TasteMate 返回 invalid_candidates 或 low_confidence。
+Hermes 说明候选字段不足，需要补充候选信息。
+Hermes 不能伪造 TasteMate 排序结果。
+```
+
 ### Hermes 未调用 TasteMate
 
 降级：
@@ -248,22 +260,13 @@ Hermes 要求补充候选信息。
 验收判定失败。
 ```
 
-### 外网补全失败
-
-迭代二主路径不默认外网补全。如后续启用：
-
-```text
-失败后立即使用已有候选继续。
-不得阻塞排序。
-```
-
 ## 九、成本与性能
 
 ```text
 TasteMate rank_candidates 调用约 0.00s - 0.01s。
 主要成本来自 Hermes 候选整理。
-迭代二默认不访问外网，避免 60s 级延迟。
-不写文件，不生成长报告。
+Hermes 应尽快形成 3-5 个 candidates 并调用 TasteMate。
+候选整理不能扩展成长报告生成。
 ```
 
 ## 十、风险与应对
@@ -296,13 +299,13 @@ TasteMate rank_candidates 调用约 0.00s - 0.01s。
 评分逻辑只使用存在的字段，不强依赖特定字段。
 ```
 
-### R-004 外网访问慢
+### R-004 Hermes 过度调研
 
 应对：
 
 ```text
-迭代二默认禁止外网访问。
-外网补全列为后续扩展。
+提示必须要求 Hermes 形成 candidates 后调用 TasteMate。
+验收以工具调用日志和 candidates 参数为准，不以普通推荐报告为准。
 ```
 
 ## 十一、验收标准
@@ -327,6 +330,8 @@ TasteMate rank_candidates 调用约 0.00s - 0.01s。
 ```text
 出现 mcp_tastemate_rank_candidates completed。
 candidates 为用户给定候选。
+每个 candidate 至少包含 id、title、summary、metadata。
+url 和 source 缺失不阻塞验收。
 没有 fixed_probe_candidates 记录。
 ```
 
@@ -343,13 +348,13 @@ Hermes 使用 fixed_probe_candidates。
 描述：
 
 ```text
-用户不给候选，Hermes 不访问外网，基于已有知识生成 3-5 个真实候选。
+用户不给候选，Hermes 基于已有知识生成 3-5 个真实候选。
 ```
 
 验证方式：
 
 ```text
-发送 @taste 推荐类问题，并明确不访问外网。
+发送 @taste 推荐类问题。
 检查工具调用日志和 candidates。
 ```
 
@@ -358,16 +363,15 @@ Hermes 使用 fixed_probe_candidates。
 ```text
 Hermes 调用 mcp_tastemate_rank_candidates。
 candidates 是真实候选。
-没有外网工具调用。
-没有文件写入。
+每个 candidate 至少包含 id、title、summary、metadata。
+url 和 source 缺失不阻塞验收。
 ```
 
 失败条件：
 
 ```text
-Hermes 访问外网。
-Hermes 写文件或生成长报告。
 Hermes 未调用 TasteMate。
+Hermes 只生成普通推荐报告。
 ```
 
 ### A-003 fixed_probe_candidates 退出主路径
@@ -396,30 +400,34 @@ Hermes 未调用 TasteMate。
 真实候选验收仍走 fixed_probe_candidates。
 ```
 
-### A-004 外网补全不进入默认主路径
+### A-004 候选最小协议校验
 
 描述：
 
 ```text
-迭代二默认不做外网补全。
+迭代二真实候选必须满足最小 candidates 协议。
 ```
 
 验证方式：
 
 ```text
-检查 Hermes 执行日志。
+检查 mcp_tastemate_rank_candidates 工具调用参数。
+传入缺少 id、title、summary 或 metadata 的候选。
 ```
 
 通过条件：
 
 ```text
-默认真实候选排序没有 terminal/browser 外网访问。
+有效候选路径中，每个 candidate 至少包含 id、title、summary、metadata。
+缺少必填字段时，TasteMate 返回 invalid_candidates、low_confidence 或等价降级结果。
+Hermes 不伪造已完成排序。
 ```
 
 失败条件：
 
 ```text
-默认流程访问外网导致明显延迟。
+缺少必填字段的候选仍被当成正常 ranked 结果验收。
+Hermes 在 TasteMate 降级后声称已完成排序。
 ```
 
 ## 十二、后续迭代

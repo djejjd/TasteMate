@@ -152,3 +152,16 @@ def test_operation_log_records_matched_route(tmp_path, monkeypatch):
     assert '"matched": true' in content
     assert '"dispatch_ok": true' in content
     assert '"dispatch_action": "ranked"' in content
+
+
+def test_operation_log_marks_fixed_probe_candidates_only_for_plugin_regression(tmp_path, monkeypatch):
+    module = load_plugin()
+    monkeypatch.setattr(module, "LOG_PATH", tmp_path / "tastemate-route.jsonl")
+    ctx = FakeContext()
+    module.register(ctx)
+
+    ctx.hooks["pre_gateway_dispatch"](event=FakeEvent("@taste 推荐几个适合我的本地知识库工具"))
+
+    content = (tmp_path / "tastemate-route.jsonl").read_text(encoding="utf-8")
+    assert '"candidate_source": "fixed_probe_candidates"' in content
+    assert '"dispatch_action": "ranked"' in content
