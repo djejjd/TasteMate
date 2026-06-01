@@ -4,7 +4,8 @@
 
 ```text
 迭代一已完成。
-当前进入迭代二需求确认与设计阶段。
+迭代二已完成。
+下一步进入迭代三 Intake / Discovery 准备阶段。
 ```
 
 迭代一已经验证：
@@ -52,13 +53,12 @@ candidates 协议
 用户给定候选的结构化
 Hermes 基于已有知识生成候选
 真实 candidates 排序
-最小预算约束提示
+候选整理边界提示
 ```
 
 ### 不做
 
 ```text
-不默认访问外网做深度调研
 不做 Hermes 工具结果自动抽取
 不做搜索前偏好注入
 不做 feedback 画像增强
@@ -70,8 +70,8 @@ Hermes 基于已有知识生成候选
 
 ```text
 问题 1：用户给候选 -> Hermes 结构化 -> TasteMate 排序，PASS。
-问题 2：不访问外网 -> Hermes 基于已有知识生成候选 -> TasteMate 排序，PASS。
-问题 3：允许一次外网补全 -> 最终 fallback 并排序，部分 PASS；外网步骤耗时 60s，不进入迭代二主路径。
+问题 2：用户不给候选 -> Hermes 基于已有知识生成候选 -> TasteMate 排序，PASS。
+问题 3：允许一次补全查询 -> 最终 fallback 并排序，部分 PASS；补全步骤耗时 60s，不作为必需路径。
 ```
 
 ### 验收标准
@@ -79,9 +79,38 @@ Hermes 基于已有知识生成候选
 ```text
 不再用 fixed_probe_candidates 作为主路径。
 Hermes 调用 mcp_tastemate_rank_candidates 时传入真实 candidates。
-candidates 至少包含 id、title、summary、url、metadata。
+candidates 必填字段至少包含 id、title、summary、metadata。
+url、source 是推荐字段；缺失时不能阻止真实候选排序验收。
 用户给定候选和 Hermes 已有知识候选两类输入都能完成排序。
-默认不访问外网、不写文件、不生成长报告。
+Hermes 候选整理不能替代 TasteMate 排序，也不能只生成普通推荐报告。
+```
+
+### 主要风险
+
+```text
+Hermes 只生成普通推荐报告，不调用 TasteMate。
+Hermes 生成的 candidates 字段不稳定。
+真实候选路径仍误走 fixed_probe_candidates。
+候选整理扩展成长链路调研，拖慢 @taste 回复。
+```
+
+### 风险应对
+
+```text
+@taste 推荐流程必须明确最终调用 mcp_tastemate_rank_candidates。
+验收以工具调用日志和 candidates 参数为准，不以最终回复文本为准。
+candidates 必填字段只要求 id、title、summary、metadata；url 和 source 作为推荐字段。
+检查 tastemate-route 日志，确认真实候选验收没有新增 fixed_probe_candidates 记录。
+提示 Hermes 尽快形成 3-5 个 candidates 并调用 TasteMate，候选整理不能替代排序。
+```
+
+### 完成结论
+
+```text
+Build、Verify、Multi-Agent Review、Closeout 已完成。
+用户给定候选和 Hermes 已有知识候选两类路径均已通过验收。
+真实候选验收中没有 fixed_probe_candidates 主路径记录。
+iteration-002 已可作为 iteration-003 的输入基线。
 ```
 
 ---
