@@ -16,8 +16,8 @@ def test_rank_candidates_tool_returns_ranked(tmp_path):
     result = rank_candidates_tool(
         query="@taste 推荐几个适合我的本地知识库工具",
         candidates=[
-            {"id": "a", "title": "Local", "summary": "Open source local-first knowledge base."},
-            {"id": "b", "title": "Cloud", "summary": "Enterprise SaaS knowledge base."},
+            {"id": "a", "title": "Local", "summary": "Open source local-first knowledge base.", "metadata": {}},
+            {"id": "b", "title": "Cloud", "summary": "Enterprise SaaS knowledge base.", "metadata": {}},
         ],
         taste_mode="force",
         profile_path=tmp_path / "profile.json",

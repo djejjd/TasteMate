@@ -1,5 +1,19 @@
 from tastemate.core.ranker import Ranker
-from tastemate.schemas.candidates import normalize_candidate
+from tastemate.schemas.candidates import normalize_candidate, validate_candidates
+
+
+def test_validate_candidates_reports_missing_required_fields():
+    result = validate_candidates(
+        [
+            {"title": "Missing id and metadata", "summary": "ok"},
+            {"id": "b", "title": "Missing summary", "metadata": {}},
+        ]
+    )
+
+    assert result["valid_candidates"] == []
+    assert len(result["invalid_candidates"]) == 2
+    assert result["invalid_candidates"][0]["missing_fields"] == ["id", "metadata"]
+    assert result["invalid_candidates"][1]["missing_fields"] == ["summary"]
 
 
 def test_normalize_candidate_generates_stable_id_from_title_and_url():
@@ -17,7 +31,7 @@ def test_normalize_candidate_generates_stable_id_from_title_and_url():
     assert candidate["url"] == "https://example.com/local"
 
 
-def test_normalize_candidate_uses_url_as_title_fallback():
+def test_normalize_candidate_uses_untitled_as_title_fallback():
     raw = {
         "url": "https://example.com/only-url",
         "summary": "Only URL candidate.",
@@ -25,7 +39,7 @@ def test_normalize_candidate_uses_url_as_title_fallback():
 
     candidate = normalize_candidate(raw)
 
-    assert candidate["title"] == "https://example.com/only-url"
+    assert candidate["title"] == "Untitled candidate"
 
 
 def test_rank_candidates_passthrough_for_factual_question():
@@ -60,7 +74,7 @@ def test_rank_candidates_needs_more_candidates_for_single_recommendation_candida
     result = Ranker(profile={}).rank(
         query="@taste 推荐几个适合我的本地知识库工具",
         candidates=[
-            {"id": "a", "title": "Only Tool", "summary": "A local-first tool."}
+            {"id": "a", "title": "Only Tool", "summary": "A local-first tool.", "metadata": {}}
         ],
         taste_mode="force",
     )
@@ -115,9 +129,78 @@ def test_rank_candidates_low_confidence_schema_for_missing_summaries():
 
     assert result["ranking_needed"] is True
     assert result["mode"] == "recommendation"
-    assert result["action"] == "low_confidence"
+    assert result["action"] == "invalid_candidates"
     assert result["ranked_candidates"] == []
-    assert result["risks"]
+    assert result["invalid_candidates"]
+
+
+def test_ranker_returns_passthrough_for_empty_candidates():
+    result = Ranker(profile={}).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[],
+        taste_mode="force",
+    )
+
+    assert result["ranking_needed"] is False
+    assert result["mode"] == "factual"
+    assert result["action"] == "passthrough"
+
+
+def test_ranker_returns_invalid_candidates_for_missing_metadata():
+    result = Ranker(profile={}).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[
+            {"id": "a", "title": "A", "summary": "ok"},
+            {"id": "b", "title": "B", "summary": "ok", "metadata": {}},
+        ],
+        taste_mode="force",
+    )
+
+    assert result["action"] == "invalid_candidates"
+    assert result["invalid_candidates"][0]["missing_fields"] == ["metadata"]
+    assert result["ranked_candidates"] == []
+
+
+def test_ranker_returns_invalid_candidates_for_missing_summary():
+    result = Ranker(profile={}).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[
+            {"id": "a", "title": "A", "metadata": {}},
+            {"id": "b", "title": "B", "summary": "ok", "metadata": {}},
+        ],
+        taste_mode="force",
+    )
+
+    assert result["action"] == "invalid_candidates"
+    assert result["invalid_candidates"][0]["missing_fields"] == ["summary"]
+
+
+def test_ranker_returns_needs_more_candidates_for_single_valid_candidate():
+    result = Ranker(profile={}).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[
+            {"id": "a", "title": "A", "summary": "ok", "metadata": {}},
+        ],
+        taste_mode="force",
+    )
+
+    assert result["action"] == "needs_more_candidates"
+    assert result["ranking_needed"] is True
+
+
+def test_ranker_returns_ranked_for_valid_candidates():
+    result = Ranker(profile={}).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[
+            {"id": "local", "title": "Local Tool", "summary": "Open source local-first knowledge base.", "metadata": {"open_source": True, "local_first": True}},
+            {"id": "cloud", "title": "Cloud Tool", "summary": "Enterprise SaaS knowledge base.", "metadata": {"cloud_required": True}},
+        ],
+        taste_mode="force",
+    )
+
+    assert result["action"] == "ranked"
+    assert result["ranked_candidates"][0]["id"] == "local"
+    assert "final_score" in result["ranked_candidates"][0]
 
 
 def test_rank_candidates_feedback_score_uses_feature_evidence_for_new_candidates():
