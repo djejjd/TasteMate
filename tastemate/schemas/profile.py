@@ -15,14 +15,28 @@ def default_profile() -> dict[str, Any]:
     return deepcopy(DEFAULT_PROFILE)
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _normalize_feature_entry(feature: str, raw: dict[str, Any]) -> dict[str, Any]:
     return {
         "feature": feature,
         "label": str(raw.get("label") or feature),
-        "weight": round(float(raw.get("weight", 0.0)), 4),
-        "confidence": round(float(raw.get("confidence", 0.0)), 4),
+        "weight": round(_safe_float(raw.get("weight", 0.0)), 4),
+        "confidence": round(_safe_float(raw.get("confidence", 0.0)), 4),
         "strength": str(raw.get("strength") or "normal"),
-        "evidence_count": int(raw.get("evidence_count", 0)),
+        "evidence_count": _safe_int(raw.get("evidence_count", 0)),
         "source": str(raw.get("source") or "feedback"),
         "last_updated": raw.get("last_updated", raw.get("last_seen")),
     }
