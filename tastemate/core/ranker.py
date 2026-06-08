@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tastemate.core.scoring import feedback_score, preference_fit, query_relevance
+from tastemate.core.scoring import feedback_score, preference_fit, profile_adjustment, query_relevance
 from tastemate.schemas.candidates import validate_candidates
 
 FACTUAL_MARKERS = ("在哪", "是什么", "配置文件", "路径", "when", "where", "what is")
@@ -68,9 +68,11 @@ class Ranker:
         relevance, relevance_reasons, relevance_risks = query_relevance(query, candidate)
         fit, fit_reasons, fit_risks = preference_fit(candidate)
         history, history_reasons = feedback_score(candidate, self.profile)
+        profile_delta, profile_reasons, profile_risks = profile_adjustment(candidate, self.profile)
         if relevance < 0.35:
             fit = min(fit, 0.35)
-        final = round(relevance * 0.55 + fit * 0.30 + history * 0.15, 4)
+            profile_delta = min(profile_delta, 0.05)
+        final = round(relevance * 0.55 + fit * 0.20 + history * 0.10 + profile_delta * 0.15, 4)
         return {
             "id": candidate["id"],
             "title": candidate["title"],
@@ -78,8 +80,8 @@ class Ranker:
             "query_relevance": relevance,
             "preference_fit": fit,
             "feedback_score": history,
-            "reasons": relevance_reasons + fit_reasons + history_reasons or ["候选满足基本排序条件"],
-            "risks": relevance_risks + fit_risks,
+            "reasons": relevance_reasons + fit_reasons + history_reasons + profile_reasons or ["候选满足基本排序条件"],
+            "risks": relevance_risks + fit_risks + profile_risks,
         }
 
     def _is_factual(self, query: str) -> bool:

@@ -238,3 +238,94 @@ def test_rank_candidates_feedback_score_uses_feature_evidence_for_new_candidates
     cloud = next(item for item in result["ranked_candidates"] if item["id"] == "cloud-tool")
     assert local["feedback_score"] > cloud["feedback_score"]
     assert any("历史反馈" in reason for reason in local["reasons"])
+
+
+def test_rank_candidates_reorders_fixed_sample_after_feedback():
+    profile = {
+        "stable_preferences": {
+            "local_first": {
+                "feature": "local_first",
+                "label": "本地优先",
+                "weight": 0.35,
+                "confidence": 0.65,
+                "strength": "strong",
+                "evidence_count": 1,
+                "source": "feedback",
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "negative_preferences": {
+            "cloud_required": {
+                "feature": "cloud_required",
+                "label": "云依赖",
+                "weight": 0.35,
+                "confidence": 0.65,
+                "strength": "strong",
+                "evidence_count": 1,
+                "source": "feedback",
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    result = Ranker(profile=profile).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[
+            {
+                "id": "cloud",
+                "title": "Cloud Tool",
+                "summary": "Enterprise SaaS knowledge base.",
+                "metadata": {"cloud_required": True},
+            },
+            {
+                "id": "local",
+                "title": "Local Tool",
+                "summary": "Open source local-first knowledge base.",
+                "metadata": {"local_first": True, "open_source": True},
+            },
+        ],
+        taste_mode="force",
+    )
+
+    assert result["action"] == "ranked"
+    assert result["ranked_candidates"][0]["id"] == "local"
+    assert any("长期正向偏好" in reason for reason in result["ranked_candidates"][0]["reasons"])
+
+
+def test_rank_candidates_current_focus_cannot_flip_low_relevance_candidate():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {
+            "open_source": {
+                "feature": "open_source",
+                "label": "开源优先",
+                "evidence_count": 1,
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "evidence_log": [],
+    }
+
+    result = Ranker(profile=profile).rank(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        candidates=[
+            {
+                "id": "relevant",
+                "title": "Relevant Local Tool",
+                "summary": "Knowledge base local-first tool.",
+                "metadata": {},
+            },
+            {
+                "id": "low",
+                "title": "Open Source SDK",
+                "summary": "A generic open source developer SDK.",
+                "metadata": {"open_source": True},
+            },
+        ],
+        taste_mode="force",
+    )
+
+    assert result["ranked_candidates"][0]["id"] == "relevant"

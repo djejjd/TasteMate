@@ -73,6 +73,33 @@ def feedback_score(candidate: dict[str, Any], profile: dict[str, Any]) -> tuple[
     return clamp(score), reasons
 
 
+def profile_adjustment(candidate: dict[str, Any], profile: dict[str, Any]) -> tuple[float, list[str], list[str]]:
+    features = candidate_features(candidate)
+    score = 0.0
+    reasons: list[str] = []
+    risks: list[str] = []
+
+    for feature, item in profile.get("stable_preferences", {}).items():
+        if feature not in features or not isinstance(item, dict):
+            continue
+        score += min(float(item.get("weight", 0.0)), 0.35) * 0.30
+        reasons.append(f"命中长期正向偏好: {feature}")
+
+    for feature, item in profile.get("negative_preferences", {}).items():
+        if feature not in features or not isinstance(item, dict):
+            continue
+        score -= min(float(item.get("weight", 0.0)), 0.35) * 0.30
+        reasons.append(f"命中长期负向偏好: {feature}")
+
+    for feature, item in profile.get("current_focus", {}).items():
+        if feature not in features or not isinstance(item, dict):
+            continue
+        score += 0.05
+        reasons.append(f"命中当前关注: {feature}")
+
+    return clamp(score), reasons, risks
+
+
 def candidate_features(candidate: dict[str, Any]) -> set[str]:
     metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
