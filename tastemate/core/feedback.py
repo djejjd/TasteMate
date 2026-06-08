@@ -41,7 +41,7 @@ class FeedbackProcessor:
 
         for candidate_id in selected:
             candidate = candidates_by_id.get(candidate_id, {})
-            feature = self._extract_feature(candidate, user_feedback)
+            feature = self._extract_feature(candidate)
             evidence = make_evidence(
                 query=query,
                 candidate_id=candidate_id,
@@ -55,12 +55,12 @@ class FeedbackProcessor:
             if is_strong_feedback:
                 self._conservatively_update_existing_stable_preference(feature, 0.10)
             applied_features.extend(
-                self._apply_feedback_update(candidate, user_feedback, direction="positive", is_strong=is_strong_feedback)
+                self._apply_feedback_update(candidate, direction="positive", is_strong=is_strong_feedback)
             )
 
         for candidate_id in rejected:
             candidate = candidates_by_id.get(candidate_id, {})
-            feature = self._extract_feature(candidate, user_feedback)
+            feature = self._extract_feature(candidate)
             evidence = make_evidence(
                 query=query,
                 candidate_id=candidate_id,
@@ -72,7 +72,7 @@ class FeedbackProcessor:
             evidence_log.append(evidence)
             extracted_signals.append({"feature": feature, "direction": "negative", "candidate_id": candidate_id})
             applied_features.extend(
-                self._apply_feedback_update(candidate, user_feedback, direction="negative", is_strong=is_strong_feedback)
+                self._apply_feedback_update(candidate, direction="negative", is_strong=is_strong_feedback)
             )
 
         current_focus = self.profile.setdefault("current_focus", {})
@@ -107,19 +107,13 @@ class FeedbackProcessor:
         text = user_feedback.strip().lower()
         return any(marker in text for marker in ("明确", "以后优先", "不要", "拒绝", "must", "never"))
 
-    def _extract_feature(self, candidate: dict[str, Any], user_feedback: str) -> str:
-        text = f"{candidate.get('title', '')} {candidate.get('summary', '')} {user_feedback}".lower()
-        if "local" in text or "本地" in text:
-            return "local_first"
-        if "open source" in text or "开源" in text:
-            return "open_source"
-        if "cloud" in text or "saas" in text:
-            return "cloud_required"
-        if "enterprise" in text or "企业" in text:
-            return "enterprise_oriented"
+    def _extract_feature(self, candidate: dict[str, Any]) -> str:
+        features = self._extract_whitelisted_features(candidate)
+        if features:
+            return features[0]
         return "general_preference"
 
-    def _extract_whitelisted_features(self, candidate: dict[str, Any], user_feedback: str) -> list[str]:
+    def _extract_whitelisted_features(self, candidate: dict[str, Any]) -> list[str]:
         metadata = candidate.get("metadata")
         features: list[str] = []
         if isinstance(metadata, dict):
@@ -127,7 +121,7 @@ class FeedbackProcessor:
                 if metadata.get(feature) is True:
                     features.append(feature)
 
-        text = f"{candidate.get('title', '')} {candidate.get('summary', '')} {user_feedback}".lower()
+        text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
         if ("local" in text or "本地" in text) and "local_first" not in features:
             features.append("local_first")
         if ("open source" in text or "开源" in text) and "open_source" not in features:
@@ -141,7 +135,6 @@ class FeedbackProcessor:
     def _apply_feedback_update(
         self,
         candidate: dict[str, Any],
-        user_feedback: str,
         *,
         direction: str,
         is_strong: bool,
@@ -150,7 +143,7 @@ class FeedbackProcessor:
         if not is_strong:
             return applied_features
 
-        for feature in self._extract_whitelisted_features(candidate, user_feedback):
+        for feature in self._extract_whitelisted_features(candidate):
             if direction == "positive":
                 self._upsert_preference(
                     "stable_preferences",

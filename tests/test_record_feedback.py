@@ -156,5 +156,5 @@ def test_record_feedback_mixed_selection_and_rejection_split_positive_negative_u
         ],
     )
 
-    assert "local_first" in profile["stable_preferences"]
-    assert "cloud_required" in profile["negative_preferences"]
+    assert sorted(profile["stable_preferences"].keys()) == ["local_first", "open_source"]
+    assert sorted(profile["negative_preferences"].keys()) == ["cloud_required", "enterprise_oriented"]
