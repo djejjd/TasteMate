@@ -41,38 +41,38 @@ class FeedbackProcessor:
 
         for candidate_id in selected:
             candidate = candidates_by_id.get(candidate_id, {})
-            feature = self._extract_feature(candidate)
-            evidence = make_evidence(
-                query=query,
-                candidate_id=candidate_id,
-                feature=feature,
-                direction="positive",
-                strength=0.7,
-                event_type="selected",
-            )
-            evidence_log.append(evidence)
-            extracted_signals.append({"feature": feature, "direction": "positive", "candidate_id": candidate_id})
-            if is_strong_feedback:
-                self._conservatively_update_existing_stable_preference(feature, 0.10)
+            features = self._extract_features(candidate)
+            for feature in features:
+                evidence = make_evidence(
+                    query=query,
+                    candidate_id=candidate_id,
+                    feature=feature,
+                    direction="positive",
+                    strength=0.7,
+                    event_type="selected",
+                )
+                evidence_log.append(evidence)
+                extracted_signals.append({"feature": feature, "direction": "positive", "candidate_id": candidate_id})
             applied_features.extend(
-                self._apply_feedback_update(candidate, direction="positive", is_strong=is_strong_feedback)
+                self._apply_feedback_update(features, direction="positive", is_strong=is_strong_feedback)
             )
 
         for candidate_id in rejected:
             candidate = candidates_by_id.get(candidate_id, {})
-            feature = self._extract_feature(candidate)
-            evidence = make_evidence(
-                query=query,
-                candidate_id=candidate_id,
-                feature=feature,
-                direction="negative",
-                strength=0.7,
-                event_type="rejected",
-            )
-            evidence_log.append(evidence)
-            extracted_signals.append({"feature": feature, "direction": "negative", "candidate_id": candidate_id})
+            features = self._extract_features(candidate)
+            for feature in features:
+                evidence = make_evidence(
+                    query=query,
+                    candidate_id=candidate_id,
+                    feature=feature,
+                    direction="negative",
+                    strength=0.7,
+                    event_type="rejected",
+                )
+                evidence_log.append(evidence)
+                extracted_signals.append({"feature": feature, "direction": "negative", "candidate_id": candidate_id})
             applied_features.extend(
-                self._apply_feedback_update(candidate, direction="negative", is_strong=is_strong_feedback)
+                self._apply_feedback_update(features, direction="negative", is_strong=is_strong_feedback)
             )
 
         current_focus = self.profile.setdefault("current_focus", {})
@@ -107,11 +107,11 @@ class FeedbackProcessor:
         text = user_feedback.strip().lower()
         return any(marker in text for marker in ("明确", "以后优先", "不要", "拒绝", "must", "never"))
 
-    def _extract_feature(self, candidate: dict[str, Any]) -> str:
+    def _extract_features(self, candidate: dict[str, Any]) -> list[str]:
         features = self._extract_whitelisted_features(candidate)
         if features:
-            return features[0]
-        return "general_preference"
+            return features
+        return ["general_preference"]
 
     def _extract_whitelisted_features(self, candidate: dict[str, Any]) -> list[str]:
         metadata = candidate.get("metadata")
@@ -134,7 +134,7 @@ class FeedbackProcessor:
 
     def _apply_feedback_update(
         self,
-        candidate: dict[str, Any],
+        features: list[str],
         *,
         direction: str,
         is_strong: bool,
@@ -143,8 +143,11 @@ class FeedbackProcessor:
         if not is_strong:
             return applied_features
 
-        for feature in self._extract_whitelisted_features(candidate):
+        for feature in features:
+            if feature not in WHITELISTED_FEATURES:
+                continue
             if direction == "positive":
+                self._conservatively_update_existing_stable_preference(feature, 0.10)
                 self._upsert_preference(
                     "stable_preferences",
                     feature,
@@ -172,12 +175,13 @@ class FeedbackProcessor:
         strength: str,
         weight: float,
         confidence: float,
+        increment_evidence_count: bool = True,
     ) -> None:
         target = self.profile.setdefault(section, {})
         current = target.get(feature)
         evidence_count = 1
         if isinstance(current, dict):
-            evidence_count = int(current.get("evidence_count", 0)) + 1
+            evidence_count = int(current.get("evidence_count", 0)) + (1 if increment_evidence_count else 0)
             target[feature] = {
                 **current,
                 "label": WHITELISTED_FEATURES.get(feature, feature),
@@ -215,5 +219,4 @@ class FeedbackProcessor:
         old_confidence = float(current.get("confidence", 0.0))
         current["weight"] = round(min(1.0, old_weight + min(delta, 0.10)), 4)
         current["confidence"] = round(min(0.70, old_confidence + 0.02), 4)
-        current["evidence_count"] = int(current.get("evidence_count", 0)) + 1
         current["last_seen"] = now_iso()

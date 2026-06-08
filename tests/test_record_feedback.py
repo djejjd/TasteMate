@@ -23,7 +23,7 @@ def test_record_feedback_writes_evidence():
     assert result["feedback_valid"] is True
     assert result["signal_strength"] == 0.7
     assert result["extracted_signals"]
-    assert len(profile["evidence_log"]) == 2
+    assert len(profile["evidence_log"]) == 4
     assert profile["evidence_log"][0]["source"] == "explicit_user_feedback"
 
 
@@ -158,3 +158,102 @@ def test_record_feedback_mixed_selection_and_rejection_split_positive_negative_u
 
     assert sorted(profile["stable_preferences"].keys()) == ["local_first", "open_source"]
     assert sorted(profile["negative_preferences"].keys()) == ["cloud_required", "enterprise_oriented"]
+
+
+def test_record_feedback_strong_positive_existing_stable_preference_counts_once():
+    profile = {
+        "stable_preferences": {
+            "local_first": {
+                "feature": "local_first",
+                "label": "本地优先",
+                "weight": 0.5,
+                "confidence": 0.6,
+                "strength": "strong",
+                "evidence_count": 2,
+                "source": "feedback",
+                "last_updated": "2026-05-26T00:00:00+08:00",
+                "last_seen": "2026-05-26T00:00:00+08:00",
+            }
+        },
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我明确更喜欢本地优先，这个方向以后优先。",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {
+                "id": "a",
+                "title": "A",
+                "summary": "local-first tool.",
+                "metadata": {"local_first": True},
+            }
+        ],
+    )
+
+    assert profile["stable_preferences"]["local_first"]["evidence_count"] == 3
+
+
+def test_record_feedback_strong_positive_multi_feature_keeps_evidence_signals_and_profile_consistent():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    result = FeedbackProcessor(profile).record(
+        query="@taste 推荐几个适合我的本地知识库工具",
+        user_feedback="我明确更喜欢本地优先、开源的工具，这个方向以后优先。",
+        selected_candidate_ids=["local-open"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {
+                "id": "local-open",
+                "title": "Local Open",
+                "summary": "Open source local-first tool.",
+                "metadata": {"local_first": True, "open_source": True},
+            }
+        ],
+    )
+
+    evidence_features = sorted(item["feature"] for item in profile["evidence_log"])
+    extracted_features = sorted(item["feature"] for item in result["extracted_signals"])
+    stable_features = sorted(profile["stable_preferences"].keys())
+
+    assert evidence_features == ["local_first", "open_source"]
+    assert extracted_features == ["local_first", "open_source"]
+    assert stable_features == ["local_first", "open_source"]
+    assert sorted(result["applied_features"]) == ["local_first", "open_source"]
+
+
+def test_record_feedback_strong_negative_promotes_negative_preferences():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    result = FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我明确不要云端企业方案，以后拒绝这个方向。",
+        selected_candidate_ids=[],
+        rejected_candidate_ids=["cloud-enterprise"],
+        candidates_snapshot=[
+            {
+                "id": "cloud-enterprise",
+                "title": "Cloud Enterprise",
+                "summary": "Enterprise SaaS.",
+                "metadata": {"cloud_required": True, "enterprise_oriented": True},
+            }
+        ],
+    )
+
+    assert result["feedback_type"] == "strong_negative"
+    assert sorted(profile["negative_preferences"].keys()) == ["cloud_required", "enterprise_oriented"]
+    assert sorted(result["applied_features"]) == ["cloud_required", "enterprise_oriented"]
