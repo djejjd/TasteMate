@@ -7,6 +7,10 @@ def clamp(value: float) -> float:
     return max(0.0, min(1.0, round(value, 4)))
 
 
+def clamp_signed(value: float) -> float:
+    return max(-1.0, min(1.0, round(value, 4)))
+
+
 def query_relevance(query: str, candidate: dict[str, Any]) -> tuple[float, list[str], list[str]]:
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
     query_lower = query.lower()
@@ -97,7 +101,7 @@ def profile_adjustment(candidate: dict[str, Any], profile: dict[str, Any]) -> tu
         score += 0.05
         reasons.append(f"命中当前关注: {feature}")
 
-    return clamp(score), reasons, risks
+    return clamp_signed(score), reasons, risks
 
 
 def candidate_features(candidate: dict[str, Any]) -> set[str]:

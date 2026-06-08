@@ -294,6 +294,50 @@ def test_rank_candidates_reorders_fixed_sample_after_feedback():
     assert any("长期正向偏好" in reason for reason in result["ranked_candidates"][0]["reasons"])
 
 
+def test_rank_candidates_negative_preference_demotes_candidate():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {
+            "cloud_required": {
+                "feature": "cloud_required",
+                "label": "云依赖",
+                "weight": 0.35,
+                "confidence": 0.65,
+                "strength": "strong",
+                "evidence_count": 1,
+                "source": "feedback",
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    result = Ranker(profile=profile).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=[
+            {
+                "id": "cloud",
+                "title": "Cloud Knowledge Base",
+                "summary": "Knowledge base with cloud required sync.",
+                "metadata": {"cloud_required": True},
+            },
+            {
+                "id": "plain",
+                "title": "Plain Knowledge Base",
+                "summary": "Knowledge base with simple local storage.",
+                "metadata": {},
+            },
+        ],
+        taste_mode="force",
+    )
+
+    assert result["action"] == "ranked"
+    assert result["ranked_candidates"][0]["id"] == "plain"
+    cloud = next(item for item in result["ranked_candidates"] if item["id"] == "cloud")
+    assert any("长期负向偏好" in reason for reason in cloud["reasons"])
+
+
 def test_rank_candidates_current_focus_cannot_flip_low_relevance_candidate():
     profile = {
         "stable_preferences": {},
