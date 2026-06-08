@@ -27,4 +27,5 @@ def record_feedback_tool(
         candidates_snapshot=candidates_snapshot,
     )
     store.save(profile)
+    result["profile_update_details"] = result.get("profile_updates", [])
     return result
