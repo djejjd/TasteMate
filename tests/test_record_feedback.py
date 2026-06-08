@@ -46,6 +46,70 @@ def test_record_feedback_does_not_create_stable_preference_from_single_event():
     assert profile["stable_preferences"] == {}
 
 
+def test_record_feedback_promotes_normal_signal_on_second_match():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+    processor = FeedbackProcessor(profile)
+
+    kwargs = dict(
+        query="@taste 推荐几个知识库工具",
+        user_feedback="我比较喜欢本地优先",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {"id": "a", "title": "A", "summary": "local-first", "metadata": {"local_first": True}}
+        ],
+    )
+
+    first = processor.record(**kwargs)
+
+    assert first["feedback_type"] == "normal_positive"
+    assert "local_first" not in profile["stable_preferences"]
+
+    second = processor.record(**kwargs)
+
+    assert second["feedback_type"] == "normal_positive"
+    assert profile["stable_preferences"]["local_first"]["evidence_count"] >= 2
+
+
+def test_record_feedback_strong_update_respects_iteration003_thresholds():
+    profile = {
+        "stable_preferences": {
+            "local_first": {
+                "feature": "local_first",
+                "label": "本地优先",
+                "weight": 0.30,
+                "confidence": 0.60,
+                "strength": "normal",
+                "evidence_count": 2,
+                "source": "feedback",
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我明确更喜欢本地优先，这个方向以后优先。",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {"id": "a", "title": "A", "summary": "local-first", "metadata": {"local_first": True}}
+        ],
+    )
+
+    updated = profile["stable_preferences"]["local_first"]
+    assert updated["weight"] <= 0.35
+    assert updated["confidence"] <= 0.65
+
+
 def test_record_feedback_limits_stable_preference_weight_delta_and_confidence():
     profile = {
         "stable_preferences": {

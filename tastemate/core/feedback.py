@@ -140,32 +140,58 @@ class FeedbackProcessor:
         is_strong: bool,
     ) -> list[str]:
         applied_features: list[str] = []
-        if not is_strong:
-            return applied_features
-
         for feature in features:
             if feature not in WHITELISTED_FEATURES:
                 continue
-            if direction == "positive":
-                self._conservatively_update_existing_stable_preference(feature, 0.10)
-                self._upsert_preference(
-                    "stable_preferences",
-                    feature,
-                    strength="strong",
-                    weight=0.35,
-                    confidence=0.65,
-                )
-                applied_features.append(feature)
-            elif direction == "negative":
-                self._upsert_preference(
-                    "negative_preferences",
-                    feature,
-                    strength="strong",
-                    weight=0.35,
-                    confidence=0.65,
-                )
+            if is_strong:
+                if direction == "positive":
+                    self._conservatively_update_existing_stable_preference(feature)
+                    self._upsert_preference(
+                        "stable_preferences",
+                        feature,
+                        strength="strong",
+                        weight=0.35,
+                        confidence=0.65,
+                    )
+                    applied_features.append(feature)
+                elif direction == "negative":
+                    self._upsert_preference(
+                        "negative_preferences",
+                        feature,
+                        strength="strong",
+                        weight=0.35,
+                        confidence=0.65,
+                    )
+                    applied_features.append(feature)
+                continue
+
+            section = "stable_preferences" if direction == "positive" else "negative_preferences"
+            promoted = self._promote_after_second_signal(section, feature)
+            if promoted:
                 applied_features.append(feature)
         return applied_features
+
+    def _promote_after_second_signal(self, section: str, feature: str) -> bool:
+        direction = "positive" if section == "stable_preferences" else "negative"
+        matching = [
+            item
+            for item in self.profile.get("evidence_log", [])
+            if item.get("feature") == feature and item.get("direction") == direction
+        ]
+        if len(matching) < 2:
+            return False
+
+        self._upsert_preference(
+            section,
+            feature,
+            strength="normal",
+            weight=0.28,
+            confidence=0.55,
+        )
+        target = self.profile.setdefault(section, {})
+        target[feature]["evidence_count"] = max(int(target[feature].get("evidence_count", 0)), len(matching))
+        self.profile.setdefault("current_focus", {})[feature]["evidence_count"] = target[feature]["evidence_count"]
+        return True
 
     def _upsert_preference(
         self,
@@ -210,13 +236,17 @@ class FeedbackProcessor:
             "last_updated": now_iso(),
         }
 
-    def _conservatively_update_existing_stable_preference(self, feature: str, delta: float) -> None:
+    def _bounded_update(self, old_weight: float, old_confidence: float) -> tuple[float, float]:
+        return min(0.35, old_weight + 0.10), min(0.65, old_confidence + 0.05)
+
+    def _conservatively_update_existing_stable_preference(self, feature: str) -> None:
         stable = self.profile.setdefault("stable_preferences", {})
         if feature not in stable:
             return
         current = stable[feature]
         old_weight = float(current.get("weight", 0.0))
         old_confidence = float(current.get("confidence", 0.0))
-        current["weight"] = round(min(1.0, old_weight + min(delta, 0.10)), 4)
-        current["confidence"] = round(min(0.70, old_confidence + 0.02), 4)
+        new_weight, new_confidence = self._bounded_update(old_weight, old_confidence)
+        current["weight"] = round(new_weight, 4)
+        current["confidence"] = round(new_confidence, 4)
         current["last_seen"] = now_iso()
