@@ -33,6 +33,7 @@ class FeedbackProcessor:
             }
 
         candidates_by_id = {str(item.get("id")): item for item in candidates_snapshot}
+        is_strong_feedback = self._is_strong_feedback(user_feedback)
         extracted_signals: list[dict[str, Any]] = []
         profile_updates: list[dict[str, Any]] = []
         applied_features: list[str] = []
@@ -51,8 +52,11 @@ class FeedbackProcessor:
             )
             evidence_log.append(evidence)
             extracted_signals.append({"feature": feature, "direction": "positive", "candidate_id": candidate_id})
-            self._conservatively_update_existing_stable_preference(feature, 0.10)
-            applied_features.extend(self._apply_feedback_type(candidate, user_feedback, feedback_type))
+            if is_strong_feedback:
+                self._conservatively_update_existing_stable_preference(feature, 0.10)
+            applied_features.extend(
+                self._apply_feedback_update(candidate, user_feedback, direction="positive", is_strong=is_strong_feedback)
+            )
 
         for candidate_id in rejected:
             candidate = candidates_by_id.get(candidate_id, {})
@@ -67,7 +71,9 @@ class FeedbackProcessor:
             )
             evidence_log.append(evidence)
             extracted_signals.append({"feature": feature, "direction": "negative", "candidate_id": candidate_id})
-            applied_features.extend(self._apply_feedback_type(candidate, user_feedback, feedback_type))
+            applied_features.extend(
+                self._apply_feedback_update(candidate, user_feedback, direction="negative", is_strong=is_strong_feedback)
+            )
 
         current_focus = self.profile.setdefault("current_focus", {})
         current_focus["last_query"] = query
@@ -93,9 +99,13 @@ class FeedbackProcessor:
         text = user_feedback.strip().lower()
         if not text and not selected and not rejected:
             return "invalid"
-        if any(marker in text for marker in ("明确", "以后优先", "不要", "拒绝", "must", "never")):
+        if self._is_strong_feedback(user_feedback):
             return "strong_negative" if rejected and not selected else "strong_positive"
         return "normal_negative" if rejected and not selected else "normal_positive"
+
+    def _is_strong_feedback(self, user_feedback: str) -> bool:
+        text = user_feedback.strip().lower()
+        return any(marker in text for marker in ("明确", "以后优先", "不要", "拒绝", "must", "never"))
 
     def _extract_feature(self, candidate: dict[str, Any], user_feedback: str) -> str:
         text = f"{candidate.get('title', '')} {candidate.get('summary', '')} {user_feedback}".lower()
@@ -128,10 +138,20 @@ class FeedbackProcessor:
             features.append("enterprise_oriented")
         return features
 
-    def _apply_feedback_type(self, candidate: dict[str, Any], user_feedback: str, feedback_type: str) -> list[str]:
+    def _apply_feedback_update(
+        self,
+        candidate: dict[str, Any],
+        user_feedback: str,
+        *,
+        direction: str,
+        is_strong: bool,
+    ) -> list[str]:
         applied_features: list[str] = []
+        if not is_strong:
+            return applied_features
+
         for feature in self._extract_whitelisted_features(candidate, user_feedback):
-            if feedback_type == "strong_positive":
+            if direction == "positive":
                 self._upsert_preference(
                     "stable_preferences",
                     feature,
@@ -140,7 +160,7 @@ class FeedbackProcessor:
                     confidence=0.65,
                 )
                 applied_features.append(feature)
-            elif feedback_type == "strong_negative":
+            elif direction == "negative":
                 self._upsert_preference(
                     "negative_preferences",
                     feature,
@@ -149,12 +169,6 @@ class FeedbackProcessor:
                     confidence=0.65,
                 )
                 applied_features.append(feature)
-            elif feedback_type == "normal_positive":
-                if self._promote_after_second_signal("stable_preferences", feature):
-                    applied_features.append(feature)
-            elif feedback_type == "normal_negative":
-                if self._promote_after_second_signal("negative_preferences", feature):
-                    applied_features.append(feature)
         return applied_features
 
     def _upsert_preference(
@@ -198,24 +212,6 @@ class FeedbackProcessor:
             "evidence_count": target[feature]["evidence_count"],
             "last_updated": now_iso(),
         }
-
-    def _promote_after_second_signal(self, section: str, feature: str) -> bool:
-        current_focus = self.profile.setdefault("current_focus", {})
-        item = current_focus.get(feature)
-        count = 1
-        if isinstance(item, dict):
-            count = int(item.get("evidence_count", 0)) + 1
-        current_focus[feature] = {
-            "feature": feature,
-            "label": WHITELISTED_FEATURES.get(feature, feature),
-            "evidence_count": count,
-            "last_updated": now_iso(),
-        }
-        if count < 2:
-            return False
-
-        self._upsert_preference(section, feature, strength="normal", weight=0.2, confidence=0.45)
-        return True
 
     def _conservatively_update_existing_stable_preference(self, feature: str, delta: float) -> None:
         stable = self.profile.setdefault("stable_preferences", {})

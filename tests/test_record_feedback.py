@@ -125,3 +125,36 @@ def test_record_feedback_invalid_does_not_write_evidence_or_profile():
     assert profile["stable_preferences"] == {}
     assert profile["negative_preferences"] == {}
     assert profile["current_focus"] == {}
+
+
+def test_record_feedback_mixed_selection_and_rejection_split_positive_negative_updates():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我选 local-open，不要 cloud-enterprise",
+        selected_candidate_ids=["local-open"],
+        rejected_candidate_ids=["cloud-enterprise"],
+        candidates_snapshot=[
+            {
+                "id": "local-open",
+                "title": "Local Open",
+                "summary": "Open source local-first tool.",
+                "metadata": {"local_first": True, "open_source": True},
+            },
+            {
+                "id": "cloud-enterprise",
+                "title": "Cloud Enterprise",
+                "summary": "Enterprise SaaS.",
+                "metadata": {"cloud_required": True, "enterprise_oriented": True},
+            },
+        ],
+    )
+
+    assert "local_first" in profile["stable_preferences"]
+    assert "cloud_required" in profile["negative_preferences"]
