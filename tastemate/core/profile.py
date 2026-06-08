@@ -3,10 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 
+def summarize_evidence(profile: dict[str, Any]) -> dict[str, int]:
+    return {"total_count": len(profile.get("evidence_log", []))}
+
+
 def summarize_profile(profile: dict[str, Any]) -> str:
     stable = profile.get("stable_preferences", {})
     current = profile.get("current_focus", {})
-    evidence_count = len(profile.get("evidence_log", []))
+    evidence_count = summarize_evidence(profile)["total_count"]
     if stable:
         names = ", ".join(sorted(stable.keys()))
         return f"当前稳定偏好：{names}。"

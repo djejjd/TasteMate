@@ -12,6 +12,16 @@ def test_get_profile_tool_returns_summary(tmp_path):
     assert result["summary"] == "当前暂无稳定偏好。"
 
 
+def test_get_profile_tool_returns_compatible_empty_shape(tmp_path):
+    result = get_profile_tool(profile_path=tmp_path / "profile.json")
+
+    assert result["stable_preferences"] == {}
+    assert result["negative_preferences"] == {}
+    assert result["current_focus"] == {}
+    assert result["evidence_summary"]["total_count"] == 0
+    assert result["summary"] == "当前暂无稳定偏好。"
+
+
 def test_rank_candidates_tool_returns_ranked(tmp_path):
     result = rank_candidates_tool(
         query="@taste 推荐几个适合我的本地知识库工具",
