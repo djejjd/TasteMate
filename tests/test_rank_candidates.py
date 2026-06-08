@@ -294,6 +294,58 @@ def test_rank_candidates_reorders_fixed_sample_after_feedback():
     assert any("长期正向偏好" in reason for reason in result["ranked_candidates"][0]["reasons"])
 
 
+def test_rank_candidates_profile_adjustment_changes_order_against_empty_profile():
+    candidates = [
+        {
+            "id": "local",
+            "title": "Local Notes",
+            "summary": "Knowledge base tool with local-first storage.",
+            "metadata": {"local_first": True},
+        },
+        {
+            "id": "mcp",
+            "title": "MCP Notes",
+            "summary": "Knowledge base tool with open source MCP integration.",
+            "metadata": {"open_source": True, "supports_mcp": True},
+        },
+    ]
+
+    empty_result = Ranker(
+        profile={"stable_preferences": {}, "negative_preferences": {}, "current_focus": {}, "evidence_log": []}
+    ).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=candidates,
+        taste_mode="force",
+    )
+
+    adjusted_result = Ranker(
+        profile={
+            "stable_preferences": {
+                "local_first": {
+                    "feature": "local_first",
+                    "label": "本地优先",
+                    "weight": 0.35,
+                    "confidence": 0.65,
+                    "strength": "strong",
+                    "evidence_count": 1,
+                    "source": "feedback",
+                    "last_updated": "2026-06-08T00:00:00+08:00",
+                }
+            },
+            "negative_preferences": {},
+            "current_focus": {},
+            "evidence_log": [],
+        }
+    ).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=candidates,
+        taste_mode="force",
+    )
+
+    assert empty_result["ranked_candidates"][0]["id"] == "mcp"
+    assert adjusted_result["ranked_candidates"][0]["id"] == "local"
+
+
 def test_rank_candidates_negative_preference_demotes_candidate():
     profile = {
         "stable_preferences": {},
@@ -336,6 +388,115 @@ def test_rank_candidates_negative_preference_demotes_candidate():
     assert result["ranked_candidates"][0]["id"] == "plain"
     cloud = next(item for item in result["ranked_candidates"] if item["id"] == "cloud")
     assert any("长期负向偏好" in reason for reason in cloud["reasons"])
+
+
+def test_rank_candidates_negative_profile_adjustment_changes_order_against_empty_profile():
+    candidates = [
+        {
+            "id": "cloud",
+            "title": "Cloud Local Notes",
+            "summary": "Knowledge base local-first open source tool with MCP sync.",
+            "metadata": {
+                "local_first": True,
+                "open_source": True,
+                "supports_mcp": True,
+                "cloud_required": True,
+            },
+        },
+        {
+            "id": "plain",
+            "title": "Plain MCP Notes",
+            "summary": "Knowledge base open source tool with MCP sync.",
+            "metadata": {"open_source": True, "supports_mcp": True},
+        },
+    ]
+
+    empty_result = Ranker(
+        profile={"stable_preferences": {}, "negative_preferences": {}, "current_focus": {}, "evidence_log": []}
+    ).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=candidates,
+        taste_mode="force",
+    )
+
+    adjusted_result = Ranker(
+        profile={
+            "stable_preferences": {},
+            "negative_preferences": {
+                "cloud_required": {
+                    "feature": "cloud_required",
+                    "label": "云依赖",
+                    "weight": 0.35,
+                    "confidence": 0.65,
+                    "strength": "strong",
+                    "evidence_count": 1,
+                    "source": "feedback",
+                    "last_updated": "2026-06-08T00:00:00+08:00",
+                }
+            },
+            "current_focus": {},
+            "evidence_log": [],
+        }
+    ).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=candidates,
+        taste_mode="force",
+    )
+
+    assert empty_result["ranked_candidates"][0]["id"] == "cloud"
+    assert adjusted_result["ranked_candidates"][0]["id"] == "plain"
+
+
+def test_rank_candidates_supports_metadata_features_array_for_profile_adjustment():
+    candidates = [
+        {
+            "id": "local",
+            "title": "Local Notes",
+            "summary": "Knowledge base local-first tool.",
+            "metadata": {"features": ["local_first"]},
+        },
+        {
+            "id": "mcp",
+            "title": "MCP Notes",
+            "summary": "Knowledge base open source MCP tool.",
+            "metadata": {"features": ["open_source", "supports_mcp"]},
+        },
+    ]
+
+    empty_result = Ranker(
+        profile={"stable_preferences": {}, "negative_preferences": {}, "current_focus": {}, "evidence_log": []}
+    ).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=candidates,
+        taste_mode="force",
+    )
+
+    adjusted_result = Ranker(
+        profile={
+            "stable_preferences": {
+                "local_first": {
+                    "feature": "local_first",
+                    "label": "本地优先",
+                    "weight": 0.35,
+                    "confidence": 0.65,
+                    "strength": "strong",
+                    "evidence_count": 1,
+                    "source": "feedback",
+                    "last_updated": "2026-06-08T00:00:00+08:00",
+                }
+            },
+            "negative_preferences": {},
+            "current_focus": {},
+            "evidence_log": [],
+        }
+    ).rank(
+        query="@taste 推荐几个适合我的知识库工具",
+        candidates=candidates,
+        taste_mode="force",
+    )
+
+    assert empty_result["ranked_candidates"][0]["id"] == "mcp"
+    assert adjusted_result["ranked_candidates"][0]["id"] == "local"
 
 
 def test_rank_candidates_current_focus_cannot_flip_low_relevance_candidate():

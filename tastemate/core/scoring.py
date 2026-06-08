@@ -108,6 +108,9 @@ def candidate_features(candidate: dict[str, Any]) -> set[str]:
     metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
     features: set[str] = set()
+    raw_features = metadata.get("features")
+    if isinstance(raw_features, list):
+        features.update(feature for feature in raw_features if isinstance(feature, str))
     if metadata.get("local_first") or "local-first" in text or "self-hosted" in text or "本地" in text:
         features.add("local_first")
     if metadata.get("open_source") or "open source" in text or "开源" in text:

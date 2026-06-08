@@ -46,6 +46,31 @@ def test_record_feedback_does_not_create_stable_preference_from_single_event():
     assert profile["stable_preferences"] == {}
 
 
+def test_record_feedback_non_whitelisted_feature_only_writes_evidence():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    result = FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我喜欢这个方向",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {"id": "a", "title": "A", "summary": "tool", "metadata": {"features": ["custom_signal"]}}
+        ],
+    )
+
+    assert result["feedback_valid"] is True
+    assert profile["stable_preferences"] == {}
+    assert profile["negative_preferences"] == {}
+    assert result["applied_features"] == []
+    assert profile["evidence_log"][0]["feature"] == "general_preference"
+
+
 def test_record_feedback_promotes_normal_signal_on_second_match():
     profile = {
         "stable_preferences": {},
@@ -293,6 +318,34 @@ def test_record_feedback_strong_positive_multi_feature_keeps_evidence_signals_an
     assert extracted_features == ["local_first", "open_source"]
     assert stable_features == ["local_first", "open_source"]
     assert sorted(result["applied_features"]) == ["local_first", "open_source"]
+
+
+def test_record_feedback_supports_metadata_features_array_for_whitelisted_promotion():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    result = FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我明确更喜欢本地优先和开源，这个方向以后优先。",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {
+                "id": "a",
+                "title": "A",
+                "summary": "tool",
+                "metadata": {"features": ["local_first", "open_source"]},
+            }
+        ],
+    )
+
+    assert result["feedback_type"] == "strong_positive"
+    assert sorted(result["applied_features"]) == ["local_first", "open_source"]
+    assert sorted(profile["stable_preferences"].keys()) == ["local_first", "open_source"]
 
 
 def test_record_feedback_strong_negative_promotes_negative_preferences():

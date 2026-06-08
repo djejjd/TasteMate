@@ -117,6 +117,11 @@ class FeedbackProcessor:
         metadata = candidate.get("metadata")
         features: list[str] = []
         if isinstance(metadata, dict):
+            raw_features = metadata.get("features")
+            if isinstance(raw_features, list):
+                for feature in raw_features:
+                    if feature in WHITELISTED_FEATURES and feature not in features:
+                        features.append(feature)
             for feature in WHITELISTED_FEATURES:
                 if metadata.get(feature) is True:
                     features.append(feature)
@@ -143,6 +148,7 @@ class FeedbackProcessor:
         for feature in features:
             if feature not in WHITELISTED_FEATURES:
                 continue
+            self._touch_current_focus(feature)
             if is_strong:
                 if direction == "positive":
                     self._conservatively_update_existing_stable_preference(feature)
@@ -233,6 +239,17 @@ class FeedbackProcessor:
             "feature": feature,
             "label": WHITELISTED_FEATURES.get(feature, feature),
             "evidence_count": target[feature]["evidence_count"],
+            "last_updated": now_iso(),
+        }
+
+    def _touch_current_focus(self, feature: str) -> None:
+        current_focus = self.profile.setdefault("current_focus", {})
+        existing = current_focus.get(feature, {})
+        previous_count = int(existing.get("evidence_count", 0)) if isinstance(existing, dict) else 0
+        current_focus[feature] = {
+            "feature": feature,
+            "label": WHITELISTED_FEATURES.get(feature, feature),
+            "evidence_count": previous_count + 1,
             "last_updated": now_iso(),
         }
 

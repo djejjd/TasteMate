@@ -8,6 +8,18 @@ from tastemate.storage.json_store import JsonProfileStore
 from tastemate.tools.rank_candidates import resolve_profile_path
 
 
+def _build_profile_update_details(profile: dict[str, Any], result: dict[str, Any]) -> dict[str, list[str]]:
+    applied = list(result.get("applied_features", []))
+    stable = sorted(feature for feature in applied if feature in profile.get("stable_preferences", {}))
+    negative = sorted(feature for feature in applied if feature in profile.get("negative_preferences", {}))
+    current = sorted(feature for feature in applied if feature in profile.get("current_focus", {}))
+    return {
+        "stable_preferences": stable,
+        "negative_preferences": negative,
+        "current_focus": current,
+    }
+
+
 def record_feedback_tool(
     *,
     query: str,
@@ -27,5 +39,5 @@ def record_feedback_tool(
         candidates_snapshot=candidates_snapshot,
     )
     store.save(profile)
-    result["profile_update_details"] = result.get("profile_updates", [])
+    result["profile_update_details"] = _build_profile_update_details(profile, result)
     return result

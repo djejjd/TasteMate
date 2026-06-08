@@ -10,7 +10,7 @@ Status / Closeout Tracking
 
 ```text
 Iteration 003 已完成 Build 与 Verify。
-当前等待 Multi-Agent Review。
+当前处于 Multi-Agent Review 修订后复核阶段。
 ```
 
 ## 已完成事项
@@ -29,13 +29,13 @@ Iteration 003 已完成 Build 与 Verify。
 ```text
 日期：2026-06-08
 命令：pytest -q
-结果：48 passed
+结果：54 passed
 验证文档：docs/iterations/iteration-003/verification.md
 ```
 
 ## 风险与待办
 
 ```text
-1. 尚未执行本轮 Multi-Agent Review。
+1. 需要对修订后的实现重新执行 Multi-Agent Review。
 2. normal_negative 对称测试仍可补充，但当前仅为 FOLLOW_UP，不阻塞验收。
 ```

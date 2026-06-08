@@ -31,6 +31,8 @@ def summarize_profile(profile: dict[str, Any]) -> str:
             f"长期负向偏好：{_joined_labels(negative_named)}；"
             f"当前关注：{_joined_labels(current_named)}。"
         )
+    if current_named:
+        return f"当前关注：{_joined_labels(current_named)}。"
     if evidence_count:
         last_query = current.get("last_query", "未知问题")
         return f"已有 {evidence_count} 条反馈证据，最近关注：{last_query}。"
