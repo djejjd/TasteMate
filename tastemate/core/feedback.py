@@ -151,7 +151,19 @@ class FeedbackProcessor:
             self._touch_current_focus(feature)
             if is_strong:
                 if direction == "positive":
-                    self._conservatively_update_existing_stable_preference(feature)
+                    existing_stable = self.profile.setdefault("stable_preferences", {}).get(feature)
+                    if isinstance(existing_stable, dict):
+                        self._conservatively_update_existing_stable_preference(feature)
+                        updated = self.profile["stable_preferences"][feature]
+                        self._upsert_preference(
+                            "stable_preferences",
+                            feature,
+                            strength="strong",
+                            weight=float(updated.get("weight", 0.0)),
+                            confidence=float(updated.get("confidence", 0.0)),
+                        )
+                        applied_features.append(feature)
+                        continue
                     self._upsert_preference(
                         "stable_preferences",
                         feature,

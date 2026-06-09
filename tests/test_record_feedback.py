@@ -194,6 +194,40 @@ def test_record_feedback_limits_stable_preference_weight_delta_and_confidence():
     assert updated["confidence"] - 0.68 <= 0.05
 
 
+def test_record_feedback_single_update_delta_stays_within_iteration003_increment_limits():
+    profile = {
+        "stable_preferences": {
+            "local_first": {
+                "feature": "local_first",
+                "label": "本地优先",
+                "weight": 0.20,
+                "confidence": 0.50,
+                "strength": "normal",
+                "evidence_count": 2,
+                "source": "feedback",
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "negative_preferences": {},
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我明确更喜欢本地优先，这个方向以后优先。",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {"id": "a", "title": "A", "summary": "local-first", "metadata": {"local_first": True}}
+        ],
+    )
+
+    updated = profile["stable_preferences"]["local_first"]
+    assert updated["weight"] - 0.20 <= 0.10
+    assert round(updated["confidence"] - 0.50, 4) <= 0.05
+
+
 def test_record_feedback_strong_positive_promotes_whitelisted_feature_once():
     profile = {
         "stable_preferences": {},
