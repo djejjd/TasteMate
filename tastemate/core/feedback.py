@@ -173,6 +173,19 @@ class FeedbackProcessor:
                     )
                     applied_features.append(feature)
                 elif direction == "negative":
+                    existing_negative = self.profile.setdefault("negative_preferences", {}).get(feature)
+                    if isinstance(existing_negative, dict):
+                        self._conservatively_update_existing_negative_preference(feature)
+                        updated = self.profile["negative_preferences"][feature]
+                        self._upsert_preference(
+                            "negative_preferences",
+                            feature,
+                            strength="strong",
+                            weight=float(updated.get("weight", 0.0)),
+                            confidence=float(updated.get("confidence", 0.0)),
+                        )
+                        applied_features.append(feature)
+                        continue
                     self._upsert_preference(
                         "negative_preferences",
                         feature,
@@ -273,6 +286,18 @@ class FeedbackProcessor:
         if feature not in stable:
             return
         current = stable[feature]
+        old_weight = float(current.get("weight", 0.0))
+        old_confidence = float(current.get("confidence", 0.0))
+        new_weight, new_confidence = self._bounded_update(old_weight, old_confidence)
+        current["weight"] = round(new_weight, 4)
+        current["confidence"] = round(new_confidence, 4)
+        current["last_seen"] = now_iso()
+
+    def _conservatively_update_existing_negative_preference(self, feature: str) -> None:
+        negative = self.profile.setdefault("negative_preferences", {})
+        if feature not in negative:
+            return
+        current = negative[feature]
         old_weight = float(current.get("weight", 0.0))
         old_confidence = float(current.get("confidence", 0.0))
         new_weight, new_confidence = self._bounded_update(old_weight, old_confidence)

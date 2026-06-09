@@ -11,7 +11,7 @@ Verify
 ```text
 Iteration 003 的本地闭环实现已完成验证。
 2026-06-08 本地执行 pytest -q，结果 54 passed。
-2026-06-09 本地再次执行 pytest -q，结果 57 passed。
+2026-06-09 本地再次执行 pytest -q，结果 58 passed。
 当前状态已完成本地 Verify，等待修订后的 Multi-Agent Review 复核。
 ```
 
@@ -30,11 +30,11 @@ pytest -q
 
 ```text
 tests/test_rank_candidates.py：20 passed
-tests/test_record_feedback.py：15 passed
+tests/test_record_feedback.py：16 passed
 tests/test_get_profile.py：4 passed
 tests/test_server_tools.py：5 passed
 tests/test_profile_store.py：4 passed
-全量 pytest：57 passed
+全量 pytest：58 passed
 ```
 
 ## 验收映射
@@ -155,6 +155,7 @@ tests/test_profile_store.py：4 passed
 - tests/test_record_feedback.py::test_record_feedback_strong_update_respects_iteration003_thresholds
 - tests/test_record_feedback.py::test_record_feedback_limits_stable_preference_weight_delta_and_confidence
 - tests/test_record_feedback.py::test_record_feedback_single_update_delta_stays_within_iteration003_increment_limits
+- tests/test_record_feedback.py::test_record_feedback_negative_update_delta_stays_within_iteration003_increment_limits
 
 通过条件：
 - 单次 strong 更新后，weight <= 0.35。

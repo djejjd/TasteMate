@@ -228,6 +228,40 @@ def test_record_feedback_single_update_delta_stays_within_iteration003_increment
     assert round(updated["confidence"] - 0.50, 4) <= 0.05
 
 
+def test_record_feedback_negative_update_delta_stays_within_iteration003_increment_limits():
+    profile = {
+        "stable_preferences": {},
+        "negative_preferences": {
+            "cloud_required": {
+                "feature": "cloud_required",
+                "label": "云依赖",
+                "weight": 0.20,
+                "confidence": 0.50,
+                "strength": "normal",
+                "evidence_count": 2,
+                "source": "feedback",
+                "last_updated": "2026-06-08T00:00:00+08:00",
+            }
+        },
+        "current_focus": {},
+        "evidence_log": [],
+    }
+
+    FeedbackProcessor(profile).record(
+        query="@taste 推荐几个工具",
+        user_feedback="我明确不要云依赖，这类以后拒绝。",
+        selected_candidate_ids=[],
+        rejected_candidate_ids=["a"],
+        candidates_snapshot=[
+            {"id": "a", "title": "A", "summary": "cloud tool", "metadata": {"cloud_required": True}}
+        ],
+    )
+
+    updated = profile["negative_preferences"]["cloud_required"]
+    assert updated["weight"] - 0.20 <= 0.10
+    assert round(updated["confidence"] - 0.50, 4) <= 0.05
+
+
 def test_record_feedback_strong_positive_promotes_whitelisted_feature_once():
     profile = {
         "stable_preferences": {},
