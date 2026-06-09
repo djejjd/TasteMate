@@ -70,3 +70,25 @@ def test_get_profile_tool_summarizes_current_focus_without_stable_preferences(tm
     assert result["stable_preferences"] == {}
     assert "当前关注" in result["summary"]
     assert "开源优先" in result["summary"]
+
+
+def test_record_feedback_tool_reports_current_focus_write_for_first_normal_feedback(tmp_path):
+    result = record_feedback_tool(
+        query="@taste 推荐几个工具",
+        user_feedback="我比较喜欢开源工具。",
+        selected_candidate_ids=["a"],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[
+            {
+                "id": "a",
+                "title": "A",
+                "summary": "open source tool",
+                "metadata": {"open_source": True},
+            }
+        ],
+        profile_path=tmp_path / "profile.json",
+    )
+
+    assert result["feedback_type"] == "normal_positive"
+    assert result["profile_update_details"]["stable_preferences"] == []
+    assert result["profile_update_details"]["current_focus"] == ["open_source"]

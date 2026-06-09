@@ -4,15 +4,21 @@ from pathlib import Path
 from typing import Any
 
 from tastemate.core.feedback import FeedbackProcessor
+from tastemate.schemas.feedback import WHITELISTED_FEATURES
 from tastemate.storage.json_store import JsonProfileStore
 from tastemate.tools.rank_candidates import resolve_profile_path
 
 
 def _build_profile_update_details(profile: dict[str, Any], result: dict[str, Any]) -> dict[str, list[str]]:
     applied = list(result.get("applied_features", []))
+    extracted = [
+        item.get("feature")
+        for item in result.get("extracted_signals", [])
+        if isinstance(item, dict) and item.get("feature") in WHITELISTED_FEATURES
+    ]
     stable = sorted(feature for feature in applied if feature in profile.get("stable_preferences", {}))
     negative = sorted(feature for feature in applied if feature in profile.get("negative_preferences", {}))
-    current = sorted(feature for feature in applied if feature in profile.get("current_focus", {}))
+    current = sorted({feature for feature in extracted if feature in profile.get("current_focus", {})})
     return {
         "stable_preferences": stable,
         "negative_preferences": negative,

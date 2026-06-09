@@ -11,6 +11,7 @@ Verify
 ```text
 Iteration 003 的本地闭环实现已完成验证。
 2026-06-08 本地执行 pytest -q，结果 54 passed。
+2026-06-09 本地再次执行 pytest -q，结果 56 passed。
 当前状态已完成本地 Verify，等待修订后的 Multi-Agent Review 复核。
 ```
 
@@ -29,11 +30,11 @@ pytest -q
 
 ```text
 tests/test_rank_candidates.py：20 passed
-tests/test_record_feedback.py：13 passed
-tests/test_get_profile.py：3 passed
+tests/test_record_feedback.py：14 passed
+tests/test_get_profile.py：4 passed
 tests/test_server_tools.py：5 passed
 tests/test_profile_store.py：4 passed
-全量 pytest：54 passed
+全量 pytest：56 passed
 ```
 
 ## 验收映射
@@ -157,6 +158,7 @@ tests/test_profile_store.py：4 passed
 通过条件：
 - 单次 strong 更新后，weight <= 0.35。
 - 单次 strong 更新后，confidence <= 0.65。
+- 单次更新相对原值的增量不超过 weight +0.10 / confidence +0.05。
 ```
 
 ## 残留事项

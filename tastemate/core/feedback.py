@@ -123,7 +123,7 @@ class FeedbackProcessor:
                     if feature in WHITELISTED_FEATURES and feature not in features:
                         features.append(feature)
             for feature in WHITELISTED_FEATURES:
-                if metadata.get(feature) is True:
+                if metadata.get(feature) is True and feature not in features:
                     features.append(feature)
 
         text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
