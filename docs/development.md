@@ -1,5 +1,8 @@
 # TasteMate 开发文档
 
+> 本文件是项目级开发基线，主要描述第一阶段到迭代二之间的通用约束与早期接口草案。
+> 当具体迭代目录下存在 `development.md` 时，以迭代级 Development Spec 作为当前 Plan 的直接约束；项目级文档只保留通用原则和历史基线，不再与当前迭代形成并列冲突口径。
+
 ## 一、开发原则
 
 第一阶段开发以验证闭环为目标：
@@ -63,10 +66,10 @@ tastemate/
     scoring.py
   storage/
     json_store.py
-    sqlite_store.py
+    sqlite_store.py   # 后续可选，不是当前默认实现
   llm/
-    client.py
-    prompts.py
+    client.py         # 后续可选，不是当前默认实现
+    prompts.py        # 后续可选，不是当前默认实现
   schemas/
     candidates.py
     feedback.py
@@ -78,6 +81,7 @@ tests/
 ```
 
 第一版可以先用 JSON 文件持久化，等字段稳定后再迁移 SQLite。
+当前迭代若无明确批准，不应把 `sqlite_store.py`、`llm/*` 或真实 LLM 评分作为默认实现边界。
 
 ---
 
@@ -145,9 +149,12 @@ tests/
   "feedback_valid": true,
   "signal_strength": 0.7,
   "extracted_signals": [],
-  "profile_updates": []
+  "profile_updates": [],
+  "summary": "本次反馈处理摘要"
 }
 ```
+
+后续迭代如需增强输出，只能在保留 `feedback_valid / signal_strength / extracted_signals / profile_updates` 基础语义的前提下追加字段。
 
 ### get_profile
 
@@ -168,6 +175,8 @@ tests/
 }
 ```
 
+后续迭代可在对象值中追加更细的证据和来源字段，但不应把这三个顶层字段从对象改成其他基础类型。
+
 ---
 
 ## 五、评分实现细节
@@ -177,6 +186,13 @@ tests/
 ```text
 规则评分
 LLM 语义评分
+```
+
+说明：
+
+```text
+这里描述的是早期可选演进方向，不是当前每个迭代都必须实现的默认路径。
+若某个迭代级 Development Spec 明确限定“只做规则逻辑、不接真实 LLM”，则以迭代级文档为准。
 ```
 
 规则评分可先实现：
@@ -281,4 +297,3 @@ UI
 复杂推荐模型训练
 全量内容采集
 ```
-

@@ -5,7 +5,8 @@
 ```text
 迭代一已完成。
 迭代二已完成。
-下一步进入迭代三 Intake / Discovery 准备阶段。
+迭代三已完成 Intake、Discovery、Design。
+当前处于 Iteration 003 Development Spec Review，下一步进入 Plan。
 ```
 
 迭代一已经验证：
@@ -134,9 +135,23 @@ negative_preferences 沉淀规则
 ### 验收标准
 
 ```text
-选择“本地优先”后，后续类似问题本地候选排名上升。
-拒绝“企业 SaaS”后，类似候选排名下降。
-单次反馈不会过度污染长期画像。
+A-001
+验证方式：对包含 local-first 候选和 cloud-required 候选的固定候选集，先记录排序，再写入“明确偏好本地优先”类强显式反馈后重新排序。
+通过条件：local-first 候选排名上升。
+失败条件：local-first 候选排名不变或下降。
+适用阶段：Iteration 003 本地 Verify。
+
+A-002
+验证方式：对包含企业 SaaS / cloud-required 候选的固定候选集，先记录排序，再写入拒绝该方向的明确反馈后重新排序。
+通过条件：对应候选排名下降。
+失败条件：对应候选排名不变或上升。
+适用阶段：Iteration 003 本地 Verify。
+
+A-003
+验证方式：输入 1 次强反馈后读取 profile，并检查新增或更新的长期画像字段。
+通过条件：weight、confidence 和单次增量均不超过迭代三 design 规定阈值。
+失败条件：任一阈值超出。
+适用阶段：Iteration 003 本地 Verify。
 ```
 
 ---

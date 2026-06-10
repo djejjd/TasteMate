@@ -7,6 +7,10 @@ def clamp(value: float) -> float:
     return max(0.0, min(1.0, round(value, 4)))
 
 
+def clamp_signed(value: float) -> float:
+    return max(-1.0, min(1.0, round(value, 4)))
+
+
 def query_relevance(query: str, candidate: dict[str, Any]) -> tuple[float, list[str], list[str]]:
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
     query_lower = query.lower()
@@ -73,10 +77,40 @@ def feedback_score(candidate: dict[str, Any], profile: dict[str, Any]) -> tuple[
     return clamp(score), reasons
 
 
+def profile_adjustment(candidate: dict[str, Any], profile: dict[str, Any]) -> tuple[float, list[str], list[str]]:
+    features = candidate_features(candidate)
+    score = 0.0
+    reasons: list[str] = []
+    risks: list[str] = []
+
+    for feature, item in profile.get("stable_preferences", {}).items():
+        if feature not in features or not isinstance(item, dict):
+            continue
+        score += min(float(item.get("weight", 0.0)), 0.35) * 0.30
+        reasons.append(f"命中长期正向偏好: {feature}")
+
+    for feature, item in profile.get("negative_preferences", {}).items():
+        if feature not in features or not isinstance(item, dict):
+            continue
+        score -= min(float(item.get("weight", 0.0)), 0.35) * 0.30
+        reasons.append(f"命中长期负向偏好: {feature}")
+
+    for feature, item in profile.get("current_focus", {}).items():
+        if feature not in features or not isinstance(item, dict):
+            continue
+        score += 0.05
+        reasons.append(f"命中当前关注: {feature}")
+
+    return clamp_signed(score), reasons, risks
+
+
 def candidate_features(candidate: dict[str, Any]) -> set[str]:
     metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
     text = f"{candidate.get('title', '')} {candidate.get('summary', '')}".lower()
     features: set[str] = set()
+    raw_features = metadata.get("features")
+    if isinstance(raw_features, list):
+        features.update(feature for feature in raw_features if isinstance(feature, str))
     if metadata.get("local_first") or "local-first" in text or "self-hosted" in text or "本地" in text:
         features.add("local_first")
     if metadata.get("open_source") or "open source" in text or "开源" in text:
