@@ -19,6 +19,8 @@ def test_record_feedback_tool_returns_compatible_iteration003_payload(tmp_path):
     assert "profile_updates" in result
     assert "feedback_type" in result
     assert "profile_update_details" in result
+    assert result["accepted"] is True
+    assert result["signal_type"] == "candidate_feedback"
     assert result["feedback_valid"] is True
     assert result["feedback_type"] == "strong_positive"
     assert result["profile_update_details"] == {
@@ -92,3 +94,19 @@ def test_record_feedback_tool_reports_current_focus_write_for_first_normal_feedb
     assert result["feedback_type"] == "normal_positive"
     assert result["profile_update_details"]["stable_preferences"] == []
     assert result["profile_update_details"]["current_focus"] == ["open_source"]
+
+
+def test_record_feedback_tool_invalid_payload_keeps_legacy_rejection_shape(tmp_path):
+    result = record_feedback_tool(
+        query="@taste 推荐几个工具",
+        user_feedback="",
+        selected_candidate_ids=[],
+        rejected_candidate_ids=[],
+        candidates_snapshot=[],
+        profile_path=tmp_path / "profile.json",
+    )
+
+    assert result["accepted"] is False
+    assert result["feedback_valid"] is False
+    assert result["feedback_type"] == "invalid"
+    assert result["signal_type"] == "candidate_feedback"
